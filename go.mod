@@ -1,6 +1,8 @@
 module linode-tui
 
 require (
+	github.com/gizak/termui/v3 v3.0.0
+	github.com/jnschaeffer/termdash v0.7.2
 	github.com/linode/linodego v0.7.1
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mum4k/termdash v0.7.2
