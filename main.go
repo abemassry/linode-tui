@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -84,6 +85,29 @@ func getLinodes() []linodego.Instance {
 		log.Fatal(err)
 	}
 	return linodes
+}
+
+func getAccount() *linodego.Account {
+	apiKey, ok := os.LookupEnv("LINODE_TOKEN")
+	if !ok {
+		log.Fatal("Could not find LINODE_TOKEN, please assert it is set.")
+	}
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: apiKey})
+	
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
+	}
+
+	linodeClient := linodego.NewClient(oauth2Client)
+	linodeClient.SetDebug(false)
+
+	account, err := linodeClient.GetAccount(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	return account
 }
 
 func bootLinode(linodeId int) error {
@@ -205,6 +229,7 @@ type LinodesView struct {
 	linodes     []linodego.Instance
 	linodeViews []*LinodeDetailView
 	listWidget  *widgets.List
+	accountWidget *widgets.List
 }
 
 func NewLinodesView() *LinodesView {
@@ -229,6 +254,20 @@ func NewLinodesView() *LinodesView {
 
 	v.linodeViews = views
 
+	account := getAccount()
+
+	accountWidget := widgets.NewList()
+	accountWidget.Title = "Account"
+	accountWidget.Rows = []string{
+		fmt.Sprintf("Name: %s %s", account.FirstName, account.LastName),
+		fmt.Sprintf("Email: %s", account.Email),
+		"",
+		"Use the arrow keys or j/k to scroll.",
+		"Thank you for using Linode Commander!",
+	}
+
+	v.accountWidget = accountWidget
+
 	return v
 }
 
@@ -239,6 +278,7 @@ func (v *LinodesView) Grid() *ui.Grid {
 	grid.Set(
 		ui.NewRow(1.0/2,
 			ui.NewCol(1.0/2, v.listWidget),
+			ui.NewCol(1.0/2, v.accountWidget),
 		),
 	)
 	return grid
