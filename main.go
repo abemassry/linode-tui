@@ -93,7 +93,7 @@ func getAccount() *linodego.Account {
 		log.Fatal("Could not find LINODE_TOKEN, please assert it is set.")
 	}
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: apiKey})
-
+	
 	oauth2Client := &http.Client{
 		Transport: &oauth2.Transport{
 			Source: tokenSource,
@@ -108,6 +108,52 @@ func getAccount() *linodego.Account {
 		log.Fatal(err)
 	}
 	return account
+}
+
+func bootLinode(linodeId int) error {
+	apiKey, ok := os.LookupEnv("LINODE_TOKEN")
+	if !ok {
+		log.Fatal("Could not find LINODE_TOKEN, please assert it is set.")
+	}
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: apiKey})
+
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
+	}
+
+	linodeClient := linodego.NewClient(oauth2Client)
+	linodeClient.SetDebug(false)
+
+	err := linodeClient.BootInstance(context.Background(), linodeId, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return err
+}
+
+func shutdownLinode(linodeId int) error {
+	apiKey, ok := os.LookupEnv("LINODE_TOKEN")
+	if !ok {
+		log.Fatal("Could not find LINODE_TOKEN, please assert it is set.")
+	}
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: apiKey})
+
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
+	}
+
+	linodeClient := linodego.NewClient(oauth2Client)
+	linodeClient.SetDebug(false)
+
+	err := linodeClient.ShutdownInstance(context.Background(), linodeId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return err
 }
 
 type LinodeDetailView struct {
@@ -162,6 +208,12 @@ func (v *LinodeDetailView) HandleEvent(ctx context.Context, e ui.Event, ch chan<
 	switch e.ID {
 	case "l":
 		ch <- v.parentView
+	case "b":
+		v.instructionsWidget.Text += "\n\n***Booting your Linode now. Please (q)uit and restart Linode Commander to view updates.***"
+		bootLinode(v.linode.ID)
+	case "s":
+		v.instructionsWidget.Text += "\n\n***Shutting down your Linode now. Please (q)uit and restart Linode Commander to view updates.***"
+		shutdownLinode(v.linode.ID)
 	default:
 	}
 
