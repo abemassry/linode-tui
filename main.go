@@ -150,6 +150,11 @@ func NewLinodeDetailView(parent View, i linodego.Instance) *LinodeDetailView {
 		[]string{"Location", i.Region},
 	}
 	tableWidget.Title = "Details"
+	if i.Status == "offline" {
+		tableWidget.RowStyles[1] = ui.NewStyle(ui.ColorWhite, ui.ColorRed, ui.ModifierBold)
+	} else {
+		tableWidget.RowStyles[1] = ui.NewStyle(ui.ColorWhite, ui.ColorGreen, ui.ModifierBold)
+	}
 
 	instructionsWidget := widgets.NewParagraph()
 	instructionsWidget.Text = "Available actions: (b)oot, (s)hutdown, (l)ist"
