@@ -93,7 +93,7 @@ func getAccount() *linodego.Account {
 		log.Fatal("Could not find LINODE_TOKEN, please assert it is set.")
 	}
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: apiKey})
-	
+
 	oauth2Client := &http.Client{
 		Transport: &oauth2.Transport{
 			Source: tokenSource,
@@ -173,9 +173,12 @@ func NewLinodeDetailView(parent View, i linodego.Instance) *LinodeDetailView {
 		[]string{"IP", i.IPv4[0].String()},
 		[]string{"Location", i.Region},
 	}
+	tableWidget.ColumnWidths = []int{15, 500}
 	tableWidget.Title = "Details"
 	if i.Status == "offline" {
 		tableWidget.RowStyles[1] = ui.NewStyle(ui.ColorWhite, ui.ColorRed, ui.ModifierBold)
+	} else if i.Status == "booting" || i.Status == "shutting_down" {
+		tableWidget.RowStyles[1] = ui.NewStyle(ui.ColorBlack, ui.ColorYellow, ui.ModifierBold)
 	} else {
 		tableWidget.RowStyles[1] = ui.NewStyle(ui.ColorWhite, ui.ColorGreen, ui.ModifierBold)
 	}
@@ -226,9 +229,9 @@ func (v *LinodeDetailView) HandleEvent(ctx context.Context, e ui.Event, ch chan<
 }
 
 type LinodesView struct {
-	linodes     []linodego.Instance
-	linodeViews []*LinodeDetailView
-	listWidget  *widgets.List
+	linodes       []linodego.Instance
+	linodeViews   []*LinodeDetailView
+	listWidget    *widgets.List
 	accountWidget *widgets.List
 }
 
