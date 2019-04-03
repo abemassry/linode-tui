@@ -19,7 +19,9 @@ var (
 // however, widget state should not be updated while the view mutex is locked.
 type View interface {
 	// Initialize sets up the view and returns a grid of UI elements to render in the terminal.
-	Initialize(context.Context) (*ui.Grid, error)
+	// Views are assumed to exist for the duration of the provided context, and should call the
+	// provided render function when they should be re-rendered.
+	Initialize(context.Context, func()) (*ui.Grid, error)
 
 	// HandleEvent is called when a UI event that is not a quit or resize event is found.
 	// When the view is ready to hand control to another view, it should return that View as
@@ -37,10 +39,16 @@ type View interface {
 // - If the event is a resize, the grid will be resized and the UI rerendered.
 // - Otherwise, the event will be passed to the view's HandleEvent method.
 func RunView(ctx context.Context, view View, events <-chan ui.Event) (View, error) {
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
+	renderCh := make(chan struct{}, 1)
 
-	grid, errInitialize := view.Initialize(ctx)
+	render := func() {
+		select {
+		case renderCh <- struct{}{}:
+		default:
+		}
+	}
+
+	grid, errInitialize := view.Initialize(ctx, render)
 	if errInitialize != nil {
 		return nil, errInitialize
 	}
@@ -74,7 +82,7 @@ func RunView(ctx context.Context, view View, events <-chan ui.Event) (View, erro
 					return next, errEvent
 				}
 			}
-		case <-ticker.C:
+		case <-renderCh:
 			view.Lock()
 			ui.Clear()
 			ui.Render(grid)
@@ -91,6 +99,7 @@ type LinodesView struct {
 	notifications       []linodego.Notification
 	linodesWidget       *widgets.List
 	notificationsWidget *widgets.List
+	render              func()
 
 	sync.Mutex
 }
@@ -101,7 +110,7 @@ func NewLinodesView(client *linodego.Client) *LinodesView {
 	}
 }
 
-func (v *LinodesView) initialize(ctx context.Context) error {
+func (v *LinodesView) initialize(ctx context.Context, render func()) error {
 	v.linodesWidget = widgets.NewList()
 	v.linodesWidget.Title = "Linodes"
 	v.linodesWidget.TextStyle = ui.NewStyle(ui.ColorBlue)
@@ -111,6 +120,8 @@ func (v *LinodesView) initialize(ctx context.Context) error {
 	v.notificationsWidget.Title = "Notifications"
 	v.linodesWidget.TextStyle = ui.NewStyle(ui.ColorBlue)
 	v.linodesWidget.WrapText = true
+
+	v.render = render
 
 	go func() {
 		ticker := time.NewTicker(4 * time.Second)
@@ -143,6 +154,8 @@ func (v *LinodesView) grid() *ui.Grid {
 }
 
 func (v *LinodesView) updateState(ctx context.Context) error {
+	defer v.render()
+
 	linodes, errLinodes := v.client.ListInstances(ctx, nil)
 	if errLinodes != nil {
 		return errLinodes
@@ -172,8 +185,8 @@ func (v *LinodesView) updateState(ctx context.Context) error {
 	return nil
 }
 
-func (v *LinodesView) Initialize(ctx context.Context) (*ui.Grid, error) {
-	if errInitialize := v.initialize(ctx); errInitialize != nil {
+func (v *LinodesView) Initialize(ctx context.Context, render func()) (*ui.Grid, error) {
+	if errInitialize := v.initialize(ctx, render); errInitialize != nil {
 		return nil, errInitialize
 	}
 
@@ -181,6 +194,8 @@ func (v *LinodesView) Initialize(ctx context.Context) (*ui.Grid, error) {
 }
 
 func (v *LinodesView) HandleEvent(ctx context.Context, e ui.Event) (View, error) {
+	defer v.render()
+
 	switch e.ID {
 	case "j", "<Down>":
 		v.linodesWidget.ScrollDown()
@@ -214,6 +229,7 @@ type LinodeDetailView struct {
 	parentView         View
 	tableWidget        *widgets.Table
 	instructionsWidget *widgets.Paragraph
+	render             func()
 
 	sync.Mutex
 }
@@ -242,6 +258,8 @@ func (v *LinodeDetailView) updateState(ctx context.Context) error {
 }
 
 func (v *LinodeDetailView) renderState() {
+	defer v.render()
+
 	v.Lock()
 	defer v.Unlock()
 
@@ -285,7 +303,7 @@ func (v *LinodeDetailView) grid() *ui.Grid {
 	return grid
 }
 
-func (v *LinodeDetailView) Initialize(ctx context.Context) (*ui.Grid, error) {
+func (v *LinodeDetailView) Initialize(ctx context.Context, render func()) (*ui.Grid, error) {
 	v.tableWidget = widgets.NewTable()
 	v.tableWidget.ColumnWidths = []int{15}
 	v.tableWidget.Title = "Details"
@@ -293,6 +311,8 @@ func (v *LinodeDetailView) Initialize(ctx context.Context) (*ui.Grid, error) {
 	v.instructionsWidget = widgets.NewParagraph()
 	v.instructionsWidget.Text = "Available actions: (b)oot, (s)hutdown, (l)ist"
 	v.instructionsWidget.Title = "Instructions"
+
+	v.render = render
 
 	go func() {
 		ticker := time.NewTicker(2 * time.Second)
@@ -317,6 +337,8 @@ func (v *LinodeDetailView) Initialize(ctx context.Context) (*ui.Grid, error) {
 }
 
 func (v *LinodeDetailView) HandleEvent(ctx context.Context, e ui.Event) (View, error) {
+	defer v.render()
+
 	switch e.ID {
 	case "l":
 		return v.parentView, nil
