@@ -123,6 +123,7 @@ func (v *LinodesView) initialize(ctx context.Context, render func()) error {
 	v.linodesWidget.WrapText = true
 
 	v.tabsWidget = widgets.NewTabPane("Linodes", "NodeBalancers", "DNS Manager", "Account", "Support", "My Profile")
+	v.tabsWidget.ActiveTabStyle = ui.NewStyle(ui.ColorGreen)
 
 	v.render = render
 
