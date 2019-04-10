@@ -99,6 +99,7 @@ type LinodesView struct {
 	notifications       []linodego.Notification
 	linodesWidget       *widgets.List
 	notificationsWidget *widgets.List
+	tabsWidget          *widgets.TabPane
 	render              func()
 
 	sync.Mutex
@@ -120,6 +121,9 @@ func (v *LinodesView) initialize(ctx context.Context, render func()) error {
 	v.notificationsWidget.Title = "Notifications"
 	v.linodesWidget.TextStyle = ui.NewStyle(ui.ColorBlue)
 	v.linodesWidget.WrapText = true
+
+	v.tabsWidget = widgets.NewTabPane("Linodes", "NodeBalancers", "DNS Manager", "Account", "Support", "My Profile")
+	v.tabsWidget.ActiveTabStyle = ui.NewStyle(ui.ColorGreen)
 
 	v.render = render
 
@@ -145,6 +149,7 @@ func (v *LinodesView) grid() *ui.Grid {
 	termWidth, termHeight := ui.TerminalDimensions()
 	grid.SetRect(0, 0, termWidth, termHeight)
 	grid.Set(
+		ui.NewRow(1.0/16, v.tabsWidget),
 		ui.NewRow(1.0/2,
 			ui.NewCol(1.0/2, v.linodesWidget),
 			ui.NewCol(1.0/2, v.notificationsWidget),
@@ -201,6 +206,10 @@ func (v *LinodesView) HandleEvent(ctx context.Context, e ui.Event) (View, error)
 		v.linodesWidget.ScrollDown()
 	case "k", "<Up>":
 		v.linodesWidget.ScrollUp()
+	case "h", "<Left>":
+		v.tabsWidget.FocusLeft()
+	case "l", "<Right>":
+		v.tabsWidget.FocusRight()
 	case "<C-d>":
 		v.linodesWidget.ScrollHalfPageDown()
 	case "<C-u>":
